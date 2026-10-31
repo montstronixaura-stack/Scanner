@@ -9,95 +9,117 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.view.Gravity
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 
 class MainActivity : Activity() {
 
-    private val keywords = listOf(
-        "delta", "codex", "arceus", "fluxus", "hydrogen", "vegax",
-        "cryptic", "krnl", "platoboost", "executor", "exploit",
-        "injector", "synapse", "jjsploit", "solara", "ronix",
-        "macsploit", "scriptware", "xeno", "nezur", "trigon",
-        "valyse", "evon", "roexec", "autoexec"
-    )
-
-    // Palabras cortas o comunes: solo coinciden si el nombre ES exactamente esto.
-    private val exactNames = listOf("wave", "swift", "electron", "evon")
-
-    // Extensiones de script que se reportan siempre.
-    private val scriptExt = listOf("lua", "luau")
-
-    private lateinit var consent: CheckBox
+    private lateinit var consent: Switch
+    private lateinit var permChip: TextView
+    private lateinit var permBtn: Button
     private lateinit var fullBtn: Button
     private lateinit var appsBtn: Button
-    private lateinit var status: TextView
-    private lateinit var results: TextView
-
-    private var pendingFullScan = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = Colors.BG
+        window.navigationBarColor = Colors.BG
 
-        val pad = (16 * resources.displayMetrics.density).toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, pad * 2, pad, pad)
+            setPadding(dp(20), dp(40), dp(20), dp(28))
         }
 
-        root.addView(TextView(this).apply {
-            text = "Escáner Anti-Cheat"
-            textSize = 24f
-        })
-        root.addView(TextView(this).apply {
-            text = "\nEsta app revisa SOLO nombres y extensiones, no el contenido:\n" +
+        // Encabezado
+        root.addView(label("🛡️", 44f).apply { gravity = Gravity.CENTER })
+        root.addView(label("Escáner Anti-Cheat", 26f, bold = true).apply {
+            gravity = Gravity.CENTER
+        }, params(4))
+        root.addView(
+            label("Revisión voluntaria y superficial de tu dispositivo", 14f, Colors.MUTED)
+                .apply { gravity = Gravity.CENTER },
+            params(4)
+        )
+
+        // Qué se revisa
+        val info = card()
+        info.addView(label("Qué se revisa", 16f, bold = true))
+        info.addView(
+            label(
                 "• Apps instaladas (nombre y paquete)\n" +
-                "• Nombres de carpetas y archivos de todo el almacenamiento, " +
-                "para buscar coincidencias con ejecutores conocidos y archivos de script (.lua, .luau)\n\n" +
+                    "• Nombres de carpetas y archivos del almacenamiento\n" +
+                    "• Archivos de script (.lua, .luau)",
+                14f, Colors.MUTED
+            ), params(8)
+        )
+        info.addView(
+            label(
                 "No lee el contenido de tus archivos, no accede a datos de otras apps " +
-                "y no envía nada por internet. El resultado se muestra solo en esta pantalla."
-            textSize = 15f
-        })
+                    "y no envía nada por internet. Los resultados se muestran solo en tu pantalla.",
+                13f, Colors.MUTED
+            ), params(10)
+        )
+        root.addView(info, params(24))
 
-        consent = CheckBox(this).apply {
+        // Paso 1: consentimiento
+        val step1 = card()
+        step1.addView(label("Paso 1 · Consentimiento", 16f, bold = true))
+        consent = Switch(this).apply {
             text = "Acepto que se realice este escaneo"
-            setOnCheckedChangeListener { _, _ -> refreshButtons() }
+            setTextColor(Colors.TEXT)
+            textSize = 14f
+            setOnCheckedChangeListener { _, _ -> refresh() }
         }
-        root.addView(consent)
+        step1.addView(consent, params(12))
+        root.addView(step1, params(14))
 
-        fullBtn = Button(this).apply {
-            text = "Iniciar escaneo completo"
-            setOnClickListener { onFullClicked() }
+        // Paso 2: permiso
+        val step2 = card()
+        val head = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
-        root.addView(fullBtn)
-
-        appsBtn = Button(this).apply {
-            text = "Escanear solo apps (sin permiso de archivos)"
-            setOnClickListener { runScan(includeFiles = false) }
+        head.addView(
+            label("Paso 2 · Permiso de archivos", 16f, bold = true),
+            LinearLayout.LayoutParams(0, WRAP, 1f)
+        )
+        permChip = label("", 12f, Colors.BG, bold = true).apply {
+            setPadding(dp(10), dp(4), dp(10), dp(4))
         }
-        root.addView(appsBtn)
+        head.addView(permChip, LinearLayout.LayoutParams(WRAP, WRAP))
+        step2.addView(head)
+        step2.addView(
+            label(
+                "Necesario para buscar carpetas y scripts. Se abre una pantalla de Ajustes: " +
+                    "activa el interruptor y vuelve aquí. Es opcional: sin él solo se revisan las apps.",
+                13f, Colors.MUTED
+            ), params(8)
+        )
+        permBtn = pillButton("Dar permiso de archivos", Colors.SECONDARY) { requestFilesPermission() }
+        step2.addView(permBtn, params(12))
+        root.addView(step2, params(14))
 
-        status = TextView(this).apply { textSize = 14f; setPadding(0, pad, 0, pad) }
-        root.addView(status)
+        // Acciones
+        fullBtn = pillButton("Iniciar escaneo completo", Colors.ACCENT) { launch(true) }
+        root.addView(fullBtn, params(22))
+        appsBtn = pillButton("Escanear solo apps", Colors.SECONDARY) { launch(false) }
+        root.addView(appsBtn, params(10))
 
-        results = TextView(this).apply { textSize = 14f }
-        root.addView(results)
-
-        setContentView(ScrollView(this).apply { addView(root) })
-        refreshButtons()
+        setContentView(ScrollView(this).apply {
+            setBackgroundColor(Colors.BG)
+            isFillViewport = true
+            addView(root)
+        })
+        refresh()
     }
 
     override fun onResume() {
         super.onResume()
-        if (pendingFullScan && consent.isChecked && hasFilesPermission()) {
-            pendingFullScan = false
-            runScan(includeFiles = true)
-        } else {
-            refreshButtons()
-        }
+        refresh()
     }
 
     private fun hasFilesPermission(): Boolean =
@@ -108,14 +130,7 @@ class MainActivity : Activity() {
                 PackageManager.PERMISSION_GRANTED
         }
 
-    private fun onFullClicked() {
-        if (hasFilesPermission()) {
-            runScan(includeFiles = true)
-            return
-        }
-        pendingFullScan = true
-        status.text = "Activa el permiso de archivos y vuelve a esta app. " +
-            "El escaneo empezará solo."
+    private fun requestFilesPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             startActivity(
                 Intent(
@@ -130,98 +145,21 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, res: IntArray) {
         super.onRequestPermissionsResult(code, perms, res)
-        pendingFullScan = false
-        if (res.isNotEmpty() && res[0] == PackageManager.PERMISSION_GRANTED) {
-            runScan(includeFiles = true)
-        } else {
-            status.text = "Permiso no concedido. Puedes escanear solo las apps."
-        }
+        refresh()
     }
 
-    private fun refreshButtons() {
-        fullBtn.isEnabled = consent.isChecked
-        appsBtn.isEnabled = consent.isChecked
+    private fun refresh() {
+        val ok = hasFilesPermission()
+        permChip.text = if (ok) "✔ Concedido" else "Pendiente"
+        permChip.background = rounded(if (ok) Colors.GREEN else Colors.AMBER, 20)
+        permBtn.enable(!ok)
+        fullBtn.enable(consent.isChecked && ok)
+        appsBtn.enable(consent.isChecked)
     }
 
-    private fun matches(name: String): Boolean {
-        val t = name.lowercase()
-        return keywords.any { t.contains(it) } || exactNames.any { t == it }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun runScan(includeFiles: Boolean) {
-        fullBtn.isEnabled = false
-        appsBtn.isEnabled = false
-        results.text = ""
-        status.text = "Revisando apps instaladas..."
-
-        Thread {
-            val found = StringBuilder()
-            val scripts = StringBuilder()
-            var scriptCount = 0
-            var checked = 0
-
-            // 1) Apps instaladas
-            val pm = packageManager
-            for (app in pm.getInstalledApplications(0)) {
-                checked++
-                val label = pm.getApplicationLabel(app).toString()
-                if (matches(label) || matches(app.packageName)) {
-                    found.append("APP: $label (${app.packageName})\n")
-                }
-            }
-
-            if (includeFiles) {
-                // 2) Recorrido de todo el almacenamiento (solo nombres)
-                val root = Environment.getExternalStorageDirectory()
-                root.walkTopDown()
-                    .onEnter { dir ->
-                        // Android/data y Android/obb están bloqueadas: se omiten.
-                        if (dir.parentFile == root && dir.name == "Android") return@onEnter false
-                        checked++
-                        if (dir != root && matches(dir.name)) {
-                            found.append("CARPETA: ${dir.absolutePath}\n")
-                            return@onEnter false // no entra a la carpeta
-                        }
-                        true
-                    }
-                    .forEach { f ->
-                        if (!f.isFile) return@forEach
-                        checked++
-                        if (checked % 500 == 0) {
-                            runOnUiThread { status.text = "Revisando archivos... ($checked revisados)" }
-                        }
-                        val ext = f.extension.lowercase()
-                        if (ext in scriptExt) {
-                            scriptCount++
-                            if (scriptCount <= 100) scripts.append("SCRIPT: ${f.absolutePath}\n")
-                        } else if (matches(f.name)) {
-                            found.append("ARCHIVO: ${f.absolutePath}\n")
-                        }
-                    }
-            }
-
-            runOnUiThread {
-                status.text = "Escaneo terminado. Elementos revisados: $checked"
-                val out = StringBuilder()
-                if (found.isNotEmpty()) out.append("Coincidencias:\n\n$found\n")
-                if (scriptCount > 0) {
-                    out.append("Scripts (.lua/.luau) encontrados: $scriptCount\n\n$scripts")
-                    if (scriptCount > 100) out.append("... y ${scriptCount - 100} más\n")
-                    out.append("\n")
-                }
-                if (out.isEmpty()) {
-                    out.append("Sin coincidencias.")
-                } else {
-                    out.append(
-                        "Nota: una coincidencia no es prueba definitiva " +
-                            "(por ejemplo, otra app o archivo puede llamarse \"Delta\", " +
-                            "y algunos juegos legítimos usan archivos .lua)."
-                    )
-                }
-                results.text = out.toString()
-                refreshButtons()
-            }
-        }.start()
+    private fun launch(includeFiles: Boolean) {
+        startActivity(
+            Intent(this, ResultsActivity::class.java).putExtra("files", includeFiles)
+        )
     }
 }
