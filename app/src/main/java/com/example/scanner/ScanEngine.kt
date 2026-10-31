@@ -30,7 +30,7 @@ object ScanEngine {
 
     private val scriptExt = listOf("lua", "luau")
 
-    private fun matches(name: String): Boolean {
+    fun matches(name: String): Boolean {
         val t = name.lowercase()
         return keywords.any { t.contains(it) } || exactNames.any { t == it }
     }
