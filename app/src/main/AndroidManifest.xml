@@ -12,7 +12,8 @@
         android:maxSdkVersion="32" />
 
     <application
-        android:label="Escáner Anti-Cheat"
+        android:label="Loguen"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
             android:name=".KeyActivity"
