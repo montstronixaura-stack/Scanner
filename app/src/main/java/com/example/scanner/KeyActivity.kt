@@ -17,7 +17,6 @@ import android.view.WindowManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 
 class KeyActivity : Activity() {
@@ -59,7 +58,7 @@ class KeyActivity : Activity() {
 
         val tile = LinearLayout(this).apply {
             gravity = Gravity.CENTER
-            background = rounded(Colors.ACCENT, 16)
+            background = rounded(Colors.ACCENT, 18)
         }
         tile.addView(label("🛡️", 28f))
         root.addView(tile, LinearLayout.LayoutParams(dp(60), dp(60)))
@@ -155,11 +154,7 @@ class KeyActivity : Activity() {
             params(16)
         )
 
-        setContentView(ScrollView(this).apply {
-            setBackgroundColor(Colors.BG)
-            isFillViewport = true
-            addView(root)
-        })
+        setContentView(glassScreen(root))
 
         refreshBoxes()
         updateTimer()
@@ -183,7 +178,10 @@ class KeyActivity : Activity() {
             val b = boxes[i]
             b.text = if (i < t.length) t[i].toString() else ""
             val active = i == t.length && t.length < 14
-            b.background = rounded(Colors.SECONDARY, 8, if (active) Colors.ACCENT else null)
+            b.background = rounded(
+                Colors.SECONDARY, 10,
+                if (active) Colors.ACCENT else Colors.STROKE
+            )
         }
     }
 
