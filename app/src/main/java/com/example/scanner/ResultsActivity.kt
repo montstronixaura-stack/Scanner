@@ -16,10 +16,10 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
@@ -106,6 +106,7 @@ class ResultsActivity : Activity() {
     private lateinit var content: LinearLayout
     private lateinit var progressCard: LinearLayout
     private lateinit var progressText: TextView
+    private lateinit var screen: FrameLayout
     private var extrasHolder: LinearLayout? = null
     private var listHolder: LinearLayout? = null
     private var result: ScanResult? = null
@@ -149,10 +150,8 @@ class ResultsActivity : Activity() {
         progressCard.addView(progressText, params(4))
         content.addView(progressCard, params(18))
 
-        setContentView(ScrollView(this).apply {
-            setBackgroundColor(Colors.BG)
-            addView(content)
-        })
+        screen = glassScreen(content)
+        setContentView(screen)
 
         val includeFiles = intent.getBooleanExtra("files", false)
         Thread {
@@ -172,6 +171,7 @@ class ResultsActivity : Activity() {
         result = r
         content.removeView(progressCard)
         val risk = computeRisk(r)
+        tintGlow(screen, risk.color)
 
         // Tarjeta de puntaje
         val sc = card()
@@ -272,6 +272,150 @@ class ResultsActivity : Activity() {
             }
             chipViews[key] = chip
             row.addView(chip, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(8) })
+        }
+        styleChips()
+        return HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row)
+        }
+    }
+
+    private fun styleChips() {
+        for ((k, v) in chipViews) {
+            v.background = rounded(if (k == filter) Colors.ACCENT else Colors.SECONDARY, 20)
+        }
+    }
+
+    private fun severity(f: Finding): Int = when (f.kind) {
+        "APP", "CARPETA" -> 2
+        "ARCHIVO" -> 1
+        else -> if (ScanEngine.matches(f.path ?: "")) 1 else 0
+    }
+
+    private fun renderList() {
+        val h = listHolder ?: return
+        val r = result ?: return
+        h.removeAllViews()
+        val list = r.findings
+            .filter {
+                when (filter) {
+                    "ALL" -> true
+                    "APP" -> it.kind == "APP"
+                    "DIR" -> it.kind == "CARPETA" || it.kind == "ARCHIVO"
+                    else -> it.kind == "SCRIPT"
+                }
+            }
+            .sortedByDescending { severity(it) }
+        if (list.isEmpty()) {
+            h.addView(label("Sin elementos en esta categoría.", 13f, Colors.MUTED), params(4))
+            return
+        }
+        for (f in list) h.addView(findingCard(f), params(8))
+    }
+
+    private fun smallButton(text: String, onClick: () -> Unit): Button =
+        pillButton(text, Colors.SECONDARY, onClick).apply {
+            textSize = 12f
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(dp(8), dp(9), dp(8), dp(9))
+        }
+
+    private fun findingCard(f: Finding): LinearLayout {
+        val sev = severity(f)
+        val sevColor = when (sev) {
+            2 -> Colors.RED
+            1 -> Colors.AMBER
+            else -> Colors.MUTED
+        }
+        val sevName = when (sev) {
+            2 -> "Alta"
+            1 -> "Media"
+            else -> "Baja"
+        }
+        val kindName = when (f.kind) {
+            "APP" -> "App instalada"
+            "CARPETA" -> "Carpeta"
+            "ARCHIVO" -> "Archivo"
+            else -> "Script"
+        }
+
+        val c = card()
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val dot = View(this).apply { background = rounded(sevColor, 6) }
+        top.addView(dot, LinearLayout.LayoutParams(dp(8), dp(8)).apply { rightMargin = dp(10) })
+
+        val titles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        titles.addView(label(f.title, 15f, bold = true))
+        titles.addView(label(kindName, 11f, Colors.MUTED), params(2))
+        top.addView(titles, LinearLayout.LayoutParams(0, WRAP, 1f))
+
+        top.addView(label(sevName, 11f, Colors.BG, bold = true).apply {
+            background = rounded(sevColor, 8)
+            setPadding(dp(8), dp(3), dp(8), dp(3))
+        })
+        c.addView(top)
+
+        val sub = f.path ?: f.packageName ?: ""
+        c.addView(
+            label(sub, 11f, Colors.MUTED).apply { typeface = Typeface.MONOSPACE },
+            params(8)
+        )
+
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val half = { LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) } }
+        if (f.kind == "APP") {
+            row.addView(smallButton("Ajustes de la app") { openAppSettings(f.packageName) }, half())
+        } else {
+            row.addView(smallButton("Abrir carpeta") { openFolder(f.path) }, half())
+            row.addView(smallButton("Copiar ruta") { copy(f.path) }, half())
+        }
+        c.addView(row, params(12))
+        return c
+    }
+
+    private fun openAppSettings(pkg: String?) {
+        if (pkg == null) return
+        try {
+            startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
+            )
+        } catch (e: Exception) {
+            Toast.makeText(this, "No se pudo abrir los ajustes", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openFolder(path: String?) {
+        if (path == null) return
+        val file = File(path)
+        val dir = if (file.isDirectory) file else file.parentFile ?: return
+        val rootPath = Environment.getExternalStorageDirectory().absolutePath
+        val rel = dir.absolutePath.removePrefix(rootPath).trim('/')
+        val uri = Uri.parse(
+            "content://com.android.externalstorage.documents/document/primary%3A" + Uri.encode(rel)
+        )
+        try {
+            startActivity(
+                Intent(Intent.ACTION_VIEW).setDataAndType(uri, "vnd.android.document/directory")
+            )
+        } catch (e: Exception) {
+            copy(path)
+            Toast.makeText(
+                this, "No se pudo abrir; la ruta fue copiada", Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun copy(path: String?) {
+        if (path == null) return
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("ruta", path))
+        Toast.makeText(this, "Ruta copiada", Toast.LENGTH_SHORT).show()
+    }
+}View(chip, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(8) })
         }
         styleChips()
         return HorizontalScrollView(this).apply {
