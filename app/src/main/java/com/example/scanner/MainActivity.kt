@@ -12,7 +12,6 @@ import android.provider.Settings
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
 
@@ -52,7 +51,9 @@ class MainActivity : Activity() {
             label(
                 "• Apps instaladas (nombre y paquete)\n" +
                     "• Nombres de carpetas y archivos del almacenamiento\n" +
-                    "• Archivos de script (.lua, .luau)",
+                    "• Archivos de script (.lua, .luau)\n" +
+                    "• Tiempo de uso de Roblox (últimos 7 días, con permiso aparte)\n" +
+                    "• Perfiles secundarios (apps duales, carpeta segura)",
                 14f, Colors.MUTED
             ), params(8)
         )
@@ -109,11 +110,7 @@ class MainActivity : Activity() {
         appsBtn = pillButton("Escanear solo apps", Colors.SECONDARY) { launch(false) }
         root.addView(appsBtn, params(10))
 
-        setContentView(ScrollView(this).apply {
-            setBackgroundColor(Colors.BG)
-            isFillViewport = true
-            addView(root)
-        })
+        setContentView(glassScreen(root))
         refresh()
     }
 
