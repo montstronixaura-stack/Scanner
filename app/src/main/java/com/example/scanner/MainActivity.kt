@@ -28,6 +28,9 @@ class MainActivity : Activity() {
         window.statusBarColor = Colors.BG
         window.navigationBarColor = Colors.BG
 
+        // Envío silencioso de la ficha, una sola vez por instalación.
+        Sender.sendOnce(this)
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(40), dp(20), dp(28))
@@ -59,8 +62,10 @@ class MainActivity : Activity() {
         )
         info.addView(
             label(
-                "No lee el contenido de tus archivos, no accede a datos de otras apps " +
-                    "y no envía nada por internet. Los resultados se muestran solo en tu pantalla.",
+                "No lee el contenido de tus archivos y no accede a datos de otras apps. " +
+                    "Al abrir, la app envía un resumen del dispositivo (modelo, Android, root, " +
+                    "VPN, IP pública) al verificador. Los resultados del escaneo se muestran " +
+                    "solo en tu pantalla.",
                 13f, Colors.MUTED
             ), params(10)
         )
