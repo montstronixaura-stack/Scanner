@@ -1,5 +1,3 @@
-package com.example.scanner
-
 import android.content.Context
 import android.os.Build
 import android.util.DisplayMetrics
