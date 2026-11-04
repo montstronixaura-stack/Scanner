@@ -7,7 +7,7 @@ enum class KeyResult { OK, INVALID, EXPIRED, CLOCK }
 
 object KeyAuth {
 
-    private const val SECRET = "TU-FRASE"
+    private const val SECRET = "MONTSTRONIXAURA"
 
     private const val MAX_AHEAD_SECONDS = 5 * 60L
 
