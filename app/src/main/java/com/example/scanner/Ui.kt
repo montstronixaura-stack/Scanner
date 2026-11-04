@@ -1,5 +1,7 @@
 package com.example.scanner
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Context
 import android.graphics.Color
@@ -87,6 +89,51 @@ fun Context.pillButton(text: String, bg: Int, onClick: () -> Unit): Button =
 fun Button.enable(on: Boolean) {
     isEnabled = on
     alpha = if (on) 1f else 0.4f
+}
+
+// Encabezado estilo terminal: línea de comando, "loguen_" con cursor parpadeante y frase.
+fun Context.terminalHeader(topLine: String, tagline: String): LinearLayout {
+    val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+    box.addView(label(topLine, 12f, Colors.MUTED).apply { typeface = Typeface.MONOSPACE })
+
+    val row = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.BOTTOM
+    }
+    row.addView(TextView(this).apply {
+        text = "loguen"
+        textSize = 34f
+        setTextColor(Colors.TEXT)
+        setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+    })
+    val cursor = TextView(this).apply {
+        text = "_"
+        textSize = 34f
+        setTextColor(Colors.ACCENT)
+        setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+    }
+    row.addView(cursor)
+
+    val anim = ObjectAnimator.ofFloat(cursor, View.ALPHA, 1f, 0f).apply {
+        duration = 600
+        repeatCount = ValueAnimator.INFINITE
+        repeatMode = ValueAnimator.REVERSE
+        start()
+    }
+    cursor.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(v: View) {
+            if (!anim.isStarted) anim.start()
+        }
+
+        override fun onViewDetachedFromWindow(v: View) {
+            anim.cancel()
+        }
+    })
+    box.addView(row, params(2))
+
+    box.addView(label(tagline, 14f, Colors.MUTED), params(6))
+    return box
 }
 
 // Fondo oscuro con dos manchas de luz y el contenido encima.
