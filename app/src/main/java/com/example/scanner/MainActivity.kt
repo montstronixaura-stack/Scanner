@@ -28,26 +28,13 @@ class MainActivity : Activity() {
         window.statusBarColor = Colors.BG
         window.navigationBarColor = Colors.BG
 
-        // Envío silencioso de la ficha, una sola vez por instalación.
-        Sender.sendOnce(this)
-
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(40), dp(20), dp(28))
+            setPadding(dp(20), dp(48), dp(20), dp(28))
         }
 
-        // Encabezado
-        root.addView(label("🛡️", 44f).apply { gravity = Gravity.CENTER })
-        root.addView(label("Escáner Anti-Cheat", 26f, bold = true).apply {
-            gravity = Gravity.CENTER
-        }, params(4))
-        root.addView(
-            label("Revisión voluntaria y superficial de tu dispositivo", 14f, Colors.MUTED)
-                .apply { gravity = Gravity.CENTER },
-            params(4)
-        )
+        root.addView(terminalHeader("$ loguen --iniciar", "Un check y listo"))
 
-        // Qué se revisa
         val info = card()
         info.addView(label("Qué se revisa", 16f, bold = true))
         info.addView(
@@ -62,16 +49,13 @@ class MainActivity : Activity() {
         )
         info.addView(
             label(
-                "No lee el contenido de tus archivos y no accede a datos de otras apps. " +
-                    "Al abrir, la app envía un resumen del dispositivo (modelo, Android, root, " +
-                    "VPN, IP pública) al verificador. Los resultados del escaneo se muestran " +
-                    "solo en tu pantalla.",
+                "No lee el contenido de tus archivos, no accede a datos de otras apps " +
+                    "y no envía nada por internet. Los resultados se muestran solo en tu pantalla.",
                 13f, Colors.MUTED
             ), params(10)
         )
-        root.addView(info, params(24))
+        root.addView(info, params(28))
 
-        // Paso 1: consentimiento
         val step1 = card()
         step1.addView(label("Paso 1 · Consentimiento", 16f, bold = true))
         consent = Switch(this).apply {
@@ -83,7 +67,6 @@ class MainActivity : Activity() {
         step1.addView(consent, params(12))
         root.addView(step1, params(14))
 
-        // Paso 2: permiso
         val step2 = card()
         val head = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -109,7 +92,6 @@ class MainActivity : Activity() {
         step2.addView(permBtn, params(12))
         root.addView(step2, params(14))
 
-        // Acciones
         fullBtn = pillButton("Iniciar escaneo completo", Colors.ACCENT) { launch(true) }
         root.addView(fullBtn, params(22))
         appsBtn = pillButton("Escanear solo apps", Colors.SECONDARY) { launch(false) }
