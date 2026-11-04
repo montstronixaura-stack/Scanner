@@ -108,7 +108,6 @@ class KeyActivity : Activity() {
             setPadding(px(20), px(56), px(20), px(28))
         }
 
-        // Encabezado estilo terminal
         content.addView(
             tv("$ loguen --acceso", 12f, cMuted).apply { typeface = Typeface.MONOSPACE }
         )
@@ -137,7 +136,6 @@ class KeyActivity : Activity() {
             lp(28)
         )
 
-        // Casillas
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -189,7 +187,6 @@ class KeyActivity : Activity() {
         keyArea.addView(input, FrameLayout.LayoutParams(MATCH, px(44)))
         content.addView(keyArea, lp(14))
 
-        // Barra de tiempo
         barTrack = FrameLayout(this).apply { background = rr(cStroke, 4) }
         barFill = View(this)
         barTrack.addView(barFill, FrameLayout.LayoutParams(0, MATCH))
@@ -223,7 +220,6 @@ class KeyActivity : Activity() {
             lp(16)
         )
 
-        // Fondo con luces
         val root = FrameLayout(this).apply { setBackgroundColor(cBg) }
         root.addView(
             View(this).apply { background = glow(cAccent, 380) },
@@ -279,6 +275,83 @@ class KeyActivity : Activity() {
 
     private fun setBar(frac: Float, color: Int) {
         val w = (barTrack.width * frac.coerceIn(0f, 1f)).toInt()
+        barFill.background = rr(color, 4)
+        barFill.layoutParams = FrameLayout.LayoutParams(w, MATCH)
+    }
+
+    private fun updateTimer() {
+        val t = input.text.toString()
+        if (t.length < 6) {
+            timerText.setTextColor(cMuted)
+            timerText.text = "La clave vence 4 minutos después de generarla"
+            setBar(0f, cMuted)
+            return
+        }
+        val exp = t.substring(0, 6).toLongOrNull(36)
+        if (exp == null) {
+            timerText.text = ""
+            setBar(0f, cMuted)
+            return
+        }
+        val left = exp - System.currentTimeMillis() / 1000
+        if (left <= 0) {
+            timerText.setTextColor(cRed)
+            timerText.text = "Clave vencida"
+            setBar(0f, cRed)
+            return
+        }
+        val color = when {
+            left > 60 -> cGreen
+            left > 20 -> cAmber
+            else -> cRed
+        }
+        timerText.setTextColor(color)
+        timerText.text = "Vence en ${left / 60}:${(left % 60).toString().padStart(2, '0')}"
+        setBar(left / 240f, color)
+    }
+
+    private fun show(text: String, color: Int = cRed) {
+        msg.setTextColor(color)
+        msg.text = text
+    }
+
+    private fun submit() {
+        val now = System.currentTimeMillis()
+        if (now < lockUntil) {
+            show("Demasiados intentos. Espera ${(lockUntil - now) / 1000 + 1} s")
+            return
+        }
+        val raw = input.text.toString()
+        val prefs = getSharedPreferences("keys", MODE_PRIVATE)
+        val norm = KeyAuth.normalize(raw)
+
+        val result = KeyAuth.check(raw)
+        if (result == KeyResult.OK && prefs.contains(norm)) {
+            show("Esa clave ya fue usada. Pide una nueva.")
+            return
+        }
+        when (result) {
+            KeyResult.OK -> {
+                fails = 0
+                prefs.edit().putLong(norm, now).apply()
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+            }
+            KeyResult.EXPIRED -> show("La clave venció. Pide una nueva.")
+            KeyResult.CLOCK -> show("Revisa que la fecha y hora de tu celular sean automáticas.")
+            KeyResult.INVALID -> {
+                fails++
+                if (fails >= 5) {
+                    fails = 0
+                    lockUntil = now + 60_000
+                    show("Demasiados intentos. Espera 60 s.")
+                } else {
+                    show("Clave incorrecta.")
+                }
+            }
+        }
+    }
+}ack.width * frac.coerceIn(0f, 1f)).toInt()
         barFill.background = rr(color, 4)
         barFill.layoutParams = FrameLayout.LayoutParams(w, MATCH)
     }
