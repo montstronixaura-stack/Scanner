@@ -173,7 +173,6 @@ class ResultsActivity : Activity() {
         val risk = computeRisk(r)
         tintGlow(screen, risk.color)
 
-        // Tarjeta de puntaje
         val sc = card()
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -203,7 +202,6 @@ class ResultsActivity : Activity() {
         }
         content.addView(sc, params(18))
 
-        // Métricas
         val m = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         m.addView(
             metric("Elementos revisados", "${r.checked}"),
@@ -215,13 +213,11 @@ class ResultsActivity : Activity() {
         )
         content.addView(m, params(10))
 
-        // Roblox y perfiles
         val holder = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         extrasHolder = holder
         content.addView(holder, params(10))
         Extras.fill(this, holder)
 
-        // Filtros y lista
         content.addView(label("Hallazgos", 15f, Colors.MUTED, bold = true), params(22))
         content.addView(buildChips(r), params(10))
         val lh = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
