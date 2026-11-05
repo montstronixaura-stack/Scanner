@@ -1,6 +1,7 @@
 package com.example.scanner
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -10,19 +11,19 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
-import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
-import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class ScoreRing(ctx: Context) : View(ctx) {
     var score = 0
@@ -101,156 +102,116 @@ fun computeRisk(r: ScanResult): Risk {
     }
 }
 
-class ResultsActivity : Activity() {
+class ReportView(
+    private val act: Activity,
+    private val r: ScanResult,
+    val session: String
+) {
+    private val risk = computeRisk(r)
+    private val timeMs = System.currentTimeMillis()
+    val riskInfo: Risk get() = risk
+    val riskColor: Int get() = risk.color
+    val view: LinearLayout = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
 
-    private lateinit var content: LinearLayout
-    private lateinit var progressCard: LinearLayout
-    private lateinit var progressText: TextView
-    private lateinit var screen: FrameLayout
     private var extrasHolder: LinearLayout? = null
     private var listHolder: LinearLayout? = null
-    private var result: ScanResult? = null
     private var filter = "ALL"
     private val chipViews = LinkedHashMap<String, TextView>()
 
-    private val sessionCode = (1..5)
-        .map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }
-        .joinToString("")
+    init {
+        build()
+    }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        window.statusBarColor = Colors.BG
-        window.navigationBarColor = Colors.BG
+    fun refreshExtras() {
+        extrasHolder?.let { Extras.fill(act, it) }
+    }
 
-        content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(36), dp(20), dp(28))
-        }
-
-        val header = LinearLayout(this).apply {
+    private fun build() {
+        // Tarjeta de puntaje
+        val sc = act.card()
+        val top = LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        header.addView(
-            label("Informe", 26f, bold = true),
-            LinearLayout.LayoutParams(0, WRAP, 1f)
-        )
-        header.addView(label("Sesión $sessionCode", 12f, Colors.MUTED))
-        content.addView(header)
-
-        progressCard = card()
-        progressCard.addView(
-            ProgressBar(this).apply { isIndeterminate = true },
-            LinearLayout.LayoutParams(WRAP, WRAP).apply { gravity = Gravity.CENTER_HORIZONTAL }
-        )
-        progressCard.addView(label("Escaneando...", 16f, bold = true).apply {
-            gravity = Gravity.CENTER
-        }, params(12))
-        progressText = label("Preparando...", 13f, Colors.MUTED).apply { gravity = Gravity.CENTER }
-        progressCard.addView(progressText, params(4))
-        content.addView(progressCard, params(18))
-
-        screen = glassScreen(content)
-        setContentView(screen)
-
-        val includeFiles = intent.getBooleanExtra("files", false)
-        Thread {
-            val res = ScanEngine.scan(this, includeFiles) { n ->
-                runOnUiThread { progressText.text = "$n elementos revisados" }
-            }
-            runOnUiThread { if (!isFinishing) render(res) }
-        }.start()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        extrasHolder?.let { Extras.fill(this, it) }
-    }
-
-    private fun render(r: ScanResult) {
-        result = r
-        content.removeView(progressCard)
-        val risk = computeRisk(r)
-        tintGlow(screen, risk.color)
-
-        val sc = card()
-        val top = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val ring = ScoreRing(this).apply {
+        val ring = ScoreRing(act).apply {
             score = risk.score
             ringColor = risk.color
         }
-        top.addView(ring, LinearLayout.LayoutParams(dp(96), dp(96)))
-        val side = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        side.addView(label(risk.level, 18f, risk.color, bold = true))
-        side.addView(label("de 100 puntos de riesgo", 12f, Colors.MUTED), params(2))
-        top.addView(side, LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = dp(16) })
+        top.addView(ring, LinearLayout.LayoutParams(act.dp(96), act.dp(96)))
+        val side = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
+        side.addView(act.label(risk.level, 18f, risk.color, true))
+        side.addView(act.label("de 100 puntos de riesgo", 12f, Colors.MUTED), act.params(2))
+        top.addView(side, LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = act.dp(16) })
         sc.addView(top)
 
         if (risk.reasons.isEmpty()) {
             sc.addView(
-                label("No se encontraron señales con las palabras clave actuales.", 12f, Colors.MUTED),
-                params(12)
+                act.label("No se encontraron señales con las palabras clave actuales.", 12f, Colors.MUTED),
+                act.params(12)
             )
         } else {
-            sc.addView(label("Por qué este puntaje", 12f, Colors.MUTED, bold = true), params(14))
+            sc.addView(act.label("Por qué este puntaje", 12f, Colors.MUTED, true), act.params(14))
             for (why in risk.reasons) {
-                sc.addView(label("• $why", 12f, Colors.TEXT), params(4))
+                sc.addView(act.label("• $why", 12f, Colors.TEXT), act.params(4))
             }
         }
-        content.addView(sc, params(18))
+        view.addView(sc)
 
-        val m = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        // Métricas
+        val m = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL }
         m.addView(
             metric("Elementos revisados", "${r.checked}"),
-            LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(5) }
+            LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = act.dp(5) }
         )
         m.addView(
             metric("Scripts .lua/.luau", "${r.scriptTotal}"),
-            LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = dp(5) }
+            LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = act.dp(5) }
         )
-        content.addView(m, params(10))
+        view.addView(m, act.params(10))
 
-        val holder = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        // Roblox y perfiles
+        val holder = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
         extrasHolder = holder
-        content.addView(holder, params(10))
-        Extras.fill(this, holder)
+        view.addView(holder, act.params(10))
+        Extras.fill(act, holder)
 
-        content.addView(label("Hallazgos", 15f, Colors.MUTED, bold = true), params(22))
-        content.addView(buildChips(r), params(10))
-        val lh = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        // Filtros y lista
+        view.addView(act.label("Hallazgos", 15f, Colors.MUTED, true), act.params(22))
+        view.addView(buildChips(), act.params(10))
+        val lh = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
         listHolder = lh
-        content.addView(lh, params(6))
+        view.addView(lh, act.params(6))
         renderList()
 
         if (r.scriptTotal > 100) {
-            content.addView(
-                label("Se listan 100 de ${r.scriptTotal} scripts.", 12f, Colors.MUTED),
-                params(10)
+            view.addView(
+                act.label("Se listan 100 de ${r.scriptTotal} scripts.", 12f, Colors.MUTED),
+                act.params(10)
             )
         }
-        content.addView(
-            label(
+        view.addView(
+            act.label(
                 "Una coincidencia no es prueba definitiva: otra app o archivo puede llamarse " +
                     "\"Delta\", y algunos juegos legítimos usan archivos .lua. " +
-                    "Confirma el código de sesión $sessionCode con quien verifica.",
+                    "Confirma el código de sesión $session con quien verifica.",
                 12f, Colors.MUTED
-            ), params(18)
+            ), act.params(18)
         )
-        content.addView(pillButton("Volver", Colors.ACCENT) { finish() }, params(18))
+        view.addView(
+            act.pillButton("Compartir informe", Colors.ACCENT) { showShare() },
+            act.params(18)
+        )
     }
 
     private fun metric(name: String, value: String): LinearLayout {
-        val c = card()
-        c.addView(label(name, 11f, Colors.MUTED))
-        c.addView(label(value, 20f, bold = true), params(2))
+        val c = act.card()
+        c.addView(act.label(name, 11f, Colors.MUTED))
+        c.addView(act.label(value, 20f, Colors.TEXT, true), act.params(2))
         return c
     }
 
-    private fun buildChips(r: ScanResult): HorizontalScrollView {
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+    private fun buildChips(): HorizontalScrollView {
+        val row = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL }
         val defs = listOf(
             Triple("ALL", "Todo", r.findings.size),
             Triple("APP", "Apps", r.findings.count { it.kind == "APP" }),
@@ -258,8 +219,8 @@ class ResultsActivity : Activity() {
             Triple("SCRIPT", "Scripts", r.findings.count { it.kind == "SCRIPT" })
         )
         for ((key, name, n) in defs) {
-            val chip = label("$name $n", 13f, Colors.TEXT, bold = true).apply {
-                setPadding(dp(14), dp(8), dp(14), dp(8))
+            val chip = act.label("$name $n", 13f, Colors.TEXT, true).apply {
+                setPadding(act.dp(14), act.dp(8), act.dp(14), act.dp(8))
                 setOnClickListener {
                     filter = key
                     styleChips()
@@ -267,10 +228,10 @@ class ResultsActivity : Activity() {
                 }
             }
             chipViews[key] = chip
-            row.addView(chip, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(8) })
+            row.addView(chip, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = act.dp(8) })
         }
         styleChips()
-        return HorizontalScrollView(this).apply {
+        return HorizontalScrollView(act).apply {
             isHorizontalScrollBarEnabled = false
             addView(row)
         }
@@ -278,7 +239,7 @@ class ResultsActivity : Activity() {
 
     private fun styleChips() {
         for ((k, v) in chipViews) {
-            v.background = rounded(if (k == filter) Colors.ACCENT else Colors.SECONDARY, 20)
+            v.background = act.rounded(if (k == filter) Colors.ACCENT else Colors.SECONDARY, 20)
         }
     }
 
@@ -290,7 +251,6 @@ class ResultsActivity : Activity() {
 
     private fun renderList() {
         val h = listHolder ?: return
-        val r = result ?: return
         h.removeAllViews()
         val list = r.findings
             .filter {
@@ -303,18 +263,18 @@ class ResultsActivity : Activity() {
             }
             .sortedByDescending { severity(it) }
         if (list.isEmpty()) {
-            h.addView(label("Sin elementos en esta categoría.", 13f, Colors.MUTED), params(4))
+            h.addView(act.label("Sin elementos en esta categoría.", 13f, Colors.MUTED), act.params(4))
             return
         }
-        for (f in list) h.addView(findingCard(f), params(8))
+        for (f in list) h.addView(findingCard(f), act.params(8))
     }
 
     private fun smallButton(text: String, onClick: () -> Unit): Button =
-        pillButton(text, Colors.SECONDARY, onClick).apply {
+        act.pillButton(text, Colors.SECONDARY, onClick).apply {
             textSize = 12f
             minHeight = 0
             minimumHeight = 0
-            setPadding(dp(8), dp(9), dp(8), dp(9))
+            setPadding(act.dp(8), act.dp(9), act.dp(8), act.dp(9))
         }
 
     private fun findingCard(f: Finding): LinearLayout {
@@ -336,51 +296,51 @@ class ResultsActivity : Activity() {
             else -> "Script"
         }
 
-        val c = card()
-        val top = LinearLayout(this).apply {
+        val c = act.card()
+        val top = LinearLayout(act).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val dot = View(this).apply { background = rounded(sevColor, 6) }
-        top.addView(dot, LinearLayout.LayoutParams(dp(8), dp(8)).apply { rightMargin = dp(10) })
+        val dot = View(act).apply { background = act.rounded(sevColor, 6) }
+        top.addView(dot, LinearLayout.LayoutParams(act.dp(8), act.dp(8)).apply { rightMargin = act.dp(10) })
 
-        val titles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        titles.addView(label(f.title, 15f, bold = true))
-        titles.addView(label(kindName, 11f, Colors.MUTED), params(2))
+        val titles = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
+        titles.addView(act.label(f.title, 15f, Colors.TEXT, true))
+        titles.addView(act.label(kindName, 11f, Colors.MUTED), act.params(2))
         top.addView(titles, LinearLayout.LayoutParams(0, WRAP, 1f))
 
-        top.addView(label(sevName, 11f, Colors.BG, bold = true).apply {
-            background = rounded(sevColor, 8)
-            setPadding(dp(8), dp(3), dp(8), dp(3))
+        top.addView(act.label(sevName, 11f, Colors.BG, true).apply {
+            background = act.rounded(sevColor, 8)
+            setPadding(act.dp(8), act.dp(3), act.dp(8), act.dp(3))
         })
         c.addView(top)
 
         val sub = f.path ?: f.packageName ?: ""
         c.addView(
-            label(sub, 11f, Colors.MUTED).apply { typeface = Typeface.MONOSPACE },
-            params(8)
+            act.label(sub, 11f, Colors.MUTED).apply { typeface = Typeface.MONOSPACE },
+            act.params(8)
         )
 
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val half = { LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) } }
+        val row = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL }
+        val half = { LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = act.dp(6) } }
         if (f.kind == "APP") {
             row.addView(smallButton("Ajustes de la app") { openAppSettings(f.packageName) }, half())
         } else {
             row.addView(smallButton("Abrir carpeta") { openFolder(f.path) }, half())
-            row.addView(smallButton("Copiar ruta") { copy(f.path) }, half())
+            row.addView(smallButton("Copiar ruta") { copyText(f.path, "Ruta copiada") }, half())
         }
-        c.addView(row, params(12))
+        c.addView(row, act.params(12))
         return c
     }
 
     private fun openAppSettings(pkg: String?) {
         if (pkg == null) return
         try {
-            startActivity(
+            act.startActivity(
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
             )
         } catch (e: Exception) {
-            Toast.makeText(this, "No se pudo abrir los ajustes", Toast.LENGTH_SHORT).show()
+            Toast.makeText(act, "No se pudo abrir los ajustes", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -394,21 +354,50 @@ class ResultsActivity : Activity() {
             "content://com.android.externalstorage.documents/document/primary%3A" + Uri.encode(rel)
         )
         try {
-            startActivity(
+            act.startActivity(
                 Intent(Intent.ACTION_VIEW).setDataAndType(uri, "vnd.android.document/directory")
             )
         } catch (e: Exception) {
-            copy(path)
-            Toast.makeText(
-                this, "No se pudo abrir; la ruta fue copiada", Toast.LENGTH_LONG
-            ).show()
+            copyText(path, "No se pudo abrir; la ruta fue copiada")
         }
     }
 
-    private fun copy(path: String?) {
-        if (path == null) return
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("ruta", path))
-        Toast.makeText(this, "Ruta copiada", Toast.LENGTH_SHORT).show()
+    private fun copyText(text: String?, message: String) {
+        if (text == null) return
+        val cm = act.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("loguen", text))
+        Toast.makeText(act, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun shareText(): String {
+        val apps = r.findings.count { it.kind == "APP" }
+        val files = r.findings.count { it.kind == "CARPETA" || it.kind == "ARCHIVO" }
+        val date = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(timeMs))
+        return "Loguen · Informe\n" +
+            "Sesión: $session\n" +
+            "Dispositivo: ${PhoneStatus.model()} · ${PhoneStatus.android()}\n" +
+            "Fecha: $date\n" +
+            "Resultado: ${risk.score} · ${risk.level}\n" +
+            "Apps: $apps · Carpetas y archivos: $files · Scripts: ${r.scriptTotal}\n" +
+            "Elementos revisados: ${r.checked}"
+    }
+
+    private fun showShare() {
+        val text = shareText()
+        AlertDialog.Builder(act)
+            .setTitle("Compartir informe")
+            .setMessage(
+                "Esto es exactamente lo que se compartirá. " +
+                    "No incluye rutas ni nombres de archivos.\n\n$text"
+            )
+            .setPositiveButton("Copiar") { _, _ -> copyText(text, "Informe copiado") }
+            .setNeutralButton("Enviar…") { _, _ ->
+                val i = Intent(Intent.ACTION_SEND)
+                i.type = "text/plain"
+                i.putExtra(Intent.EXTRA_TEXT, text)
+                act.startActivity(Intent.createChooser(i, "Enviar informe"))
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 }
