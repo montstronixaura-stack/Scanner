@@ -233,12 +233,15 @@ class KeyActivity : Activity() {
             try {
                 val ip = java.net.URL("https://api.ipify.org").readText().trim()
                 val geo = java.net.URL(
-                    "http://ip-api.com/json/$ip?fields=status,country,regionName,city,isp,lat,lon,query"
-                ).readText()
-                val j = org.json.JSONObject(geo)
-                .Build.VERSION.SDK_INT
-                val hora = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
-    .format(java.util.Date())
+    "http://ip-api.com/json/$ip?fields=status,country,regionName,city,isp,lat,lon,query"
+).readText()
+
+val j = org.json.JSONObject(geo)
+
+val hora = java.text.SimpleDateFormat(
+    "yyyy-MM-dd HH:mm:ss",
+    java.util.Locale.US
+).format(java.util.Date())
 
 val modelo = android.os.Build.MODEL
 val marca = android.os.Build.BRAND
